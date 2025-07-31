@@ -1,8 +1,12 @@
 name: Run Discord Bot
 
 on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'  # каждые 6 часов, пример.
+    - cron: '0 */6 * * *'  # Каждые 6 часов
 
 jobs:
   run-bot:
