@@ -8,14 +8,15 @@ from watchdog.events import FileSystemEventHandler
 
 def load_prefix_commands(bot):
     prefix_path = pathlib.Path("Commands/prefix")
-    for file in prefix_path.glob("*.py"):
+    for file in prefix_path.rglob("*.py"):
         if file.name != "__init__.py":
+            rel_path = file.relative_to("Commands").with_suffix('')
+            module = ".".join(["Commands"] + list(rel_path.parts))
             try:
-                print(f"Loading prefix command from {file.name}")
-                importlib.import_module(f"Commands.prefix.{file.stem}").setup(bot)
+                print(f"Loading prefix: {module}")
+                importlib.import_module(module).setup(bot)
             except Exception as e:
-                print(f"Error loading prefix command {file.name}: {e}")
-                traceback.print_exc()
+                print(f"Error loading prefix command {module}: {e}")
 
 
 async def load_slash_commands(bot):
