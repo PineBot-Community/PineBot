@@ -1,21 +1,24 @@
 name: Run Discord Bot
 
 on:
-  workflow_dispatch:   # Позволяет запускать вручную
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *'  # каждые 6 часов, пример
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-python@v4
         with:
           python-version: 3.11
+
       - run: pip install -r requirements.txt
+
       - name: Run bot
         env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_TOKEN: ${{ secrets.TOKEN }}
           OWNER_ID: ${{ secrets.OWNER_ID }}
         run: python bot.py
