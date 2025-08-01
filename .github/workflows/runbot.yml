@@ -9,7 +9,37 @@ on:
     - cron: '0 */6 * * *'  # Каждые 6 часов
 
 jobs:
+  disable-other-workflows:
+    name: Disable old workflows
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Disable other workflows (except this one)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # personal access token with workflow access
+        run: |
+          REPO="${{ github.repository }}"
+          CURRENT_WORKFLOW="${{ github.workflow }}"
+          
+          echo "Fetching workflows..."
+          workflows=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/$REPO/actions/workflows | jq '.workflows[] | select(.state=="active")')
+
+          for row in $(echo "${workflows}" | jq -r '.name + "::" + .id'); do
+            NAME=$(echo "$row" | cut -d "::" -f 1)
+            ID=$(echo "$row" | cut -d "::" -f 2)
+            
+            if [ "$NAME" != "$CURRENT_WORKFLOW" ]; then
+              echo "Disabling workflow: $NAME (ID: $ID)"
+              curl -s -X PUT \
+                -H "Authorization: token $GH_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/repos/$REPO/actions/workflows/$ID/disable
+            fi
+          done
+
   run-bot:
+    name: Start Bot
+    needs: disable-other-workflows
     runs-on: ubuntu-latest
 
     steps:
@@ -25,4 +55,5 @@ jobs:
         env:
           DISCORD_TOKEN: ${{ secrets.TOKEN }}
           OWNER_ID: ${{ secrets.OWNER_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: python bot.py
