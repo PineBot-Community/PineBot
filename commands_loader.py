@@ -7,7 +7,7 @@ from watchdog.events import FileSystemEventHandler
 
 def load_prefix_commands(bot):
     prefix_path = pathlib.Path("Commands/prefix")
-    for file in prefix_path.glob("*.py"):  # Только файлы верхнего уровня
+    for file in prefix_path.glob("*.py"):
         if file.name != "__init__.py":
             module_name = f"Commands.prefix.{file.stem}"
             try:
@@ -19,7 +19,7 @@ def load_prefix_commands(bot):
 
 async def load_slash_commands(bot):
     slash_path = pathlib.Path("Commands/slash")
-    for file in slash_path.glob("*.py"):  # Только файлы верхнего уровня
+    for file in slash_path.glob("*.py"):
         if file.name != "__init__.py":
             module_name = f"Commands.slash.{file.stem}"
             try:
@@ -35,18 +35,18 @@ async def load_slash_commands(bot):
 async def reload_slash_commands(bot):
     try:
         print("Reloading slash commands...")
-        bot.tree.clear_commands(guild=None)
-        await load_slash_commands(bot)
-        synced = await bot.tree.sync()
+        bot.tree.clear_commands(guild=None)  # Очистка глобальных команд
+        await load_slash_commands(bot)       # Загрузка всех команд
+        synced = await bot.tree.sync()       # Глобальная синхронизация
         print(f"Reloaded and synced {len(synced)} global slash command(s).")
     except Exception as e:
         print(f"Error during slash commands reload: {e}")
         traceback.print_exc()
 
 class CommandsReloadHandler(FileSystemEventHandler):
-    def __init__(self, loop, reload_func):
+    def __init__(self, loop, bot):
         self.loop = loop
-        self.reload_func = reload_func
+        self.bot = bot
         self.debounce_task = None
 
     def on_modified(self, event):
@@ -59,8 +59,14 @@ class CommandsReloadHandler(FileSystemEventHandler):
 
     async def delayed_reload(self):
         await asyncio.sleep(1.5)
-        print("Triggering reload of commands due to file change...")
+        print("Triggering reload of slash commands due to file change...")
         try:
-            await self.reload_func()
+            await reload_slash_commands(self.bot)
         except Exception:
             traceback.print_exc()
+
+def start_watching(loop, bot):
+    event_handler = CommandsReloadHandler(loop, bot)
+    observer = Observer()
+    observer.schedule(event_handler, path="Commands/slash", recursive=False)
+    observer.start()

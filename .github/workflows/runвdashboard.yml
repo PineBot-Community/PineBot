@@ -1,0 +1,67 @@
+name: Run Dashboard Server
+
+on:
+  push:
+    branches:
+      - dashboard   # запуск только на ветке dashboard
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'  # каждые 6 часов
+
+jobs:
+  disable-other-workflows:
+    name: Disable old workflows
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Disable other workflows (except this one)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO: ${{ github.repository }}
+          CURRENT_WORKFLOW: ${{ github.workflow }}
+        run: |
+          echo "Fetching workflows for $REPO..."
+
+          workflows=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/repos/$REPO/actions/workflows)
+
+          echo "$workflows" | jq '.workflows[] | select(.state=="active")' > workflows.json
+
+          while IFS= read -r row; do
+            name=$(echo "$row" | jq -r '.name')
+            id=$(echo "$row" | jq -r '.id')
+
+            if [ "$name" != "$CURRENT_WORKFLOW" ]; then
+              echo "Disabling: $name (ID: $id)"
+              curl -s -X PUT \
+                -H "Authorization: token $GH_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/repos/$REPO/actions/workflows/$id/disable
+            fi
+          done < <(jq -c '.' workflows.json)
+
+  run-dashboard:
+    name: Start Dashboard Server
+    runs-on: ubuntu-latest
+    needs: disable-other-workflows
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Dashboard Server
+        env:
+          OWNER_ID: ${{ secrets.OWNER_ID }}
+          # другие env переменные по необходимости
+        run: node api/index.js
